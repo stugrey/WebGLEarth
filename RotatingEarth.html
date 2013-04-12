@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Stu's WebGL World</title>
+	<style>
+	#container {
+	background: #000
+	}
+	body {
+	background-color: #ffffff;
+	margin: 0px;
+	overflow: hidden;
+	}
+	</style>
+</head>
+
+<body>
+	<div id="container"></div>
+</body>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+<script src="Three.js"></script>
+
+<!-- Shaders -->
+<script id="vertexShader" type="x-shader/x-vertex">
+varying vec2 vUv;
+varying vec3 vNormal;
+varying vec3 v_P;
+
+void main() 
+{
+	vUv = uv;
+	vNormal = normalMatrix * normal;
+	gl_Position =   projectionMatrix * modelViewMatrix * vec4(position,1.0);
+	v_P = gl_Position.xyz;
+}
+</script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+uniform sampler2D spectexture;
+uniform sampler2D cloudtexture;
+uniform vec3 sunDirection;
+
+varying vec2 vUv;
+varying vec3 vNormal;
+varying vec3 v_P;
+
+void main() 
+{
+
+	vec3 colorDay = texture2D(texture1, vUv).rgb;
+	vec3 colorNight = texture2D(texture2, vUv).rgb;
+	vec3 colorSpec = texture2D(spectexture, vUv).rgb;
+	float cloudamount = texture2D(cloudtexture, vUv).r;
+
+
+	float diffuse_value = max(dot(normalize(vNormal), sunDirection), 0.0);
+	float sphere_diffuse = max(dot(normalize(vNormal), sunDirection), 0.0);
+	float atmos_amount = max(dot(normalize(vNormal), vec3(0.0,0.0,1.0)), 0.0);
+	vec3 R  = 2.0 * ( dot(normalize(vNormal),sunDirection)) * normalize(vNormal) - sunDirection;
+	vec3 E = vec3(0.0,0.0,1.0);
+	vec3 specular_value =  colorSpec * pow( max(dot(R,E), 0.0), 6.0 );
+
+	vec3 lights;
+
+	if (colorNight.r < 0.6) {
+	lights = vec3(colorNight.r/3.0,colorNight.g/3.0,colorNight.b/1.5);
+	} else {
+	lights = vec3(colorNight.r*1.0,colorNight.g*0.8,colorNight.b*0.4);
+	}
+
+	colorNight=lights;
+
+	// compute cosine sun to normal so -1 is away from sun and +1 is toward sun.
+	float cosineAngleSunToNormal = dot(normalize(vNormal), sunDirection);
+
+	// sharpen the edge beween the transition
+	//cosineAngleSunToNormal = clamp( cosineAngleSunToNormal * 30.0, -1.0, 1.0);
+	sphere_diffuse = clamp( sphere_diffuse * 10.0, -1.0, 1.0);
+
+	// convert to 0 to 1 for mixing
+	float mixAmount = cosineAngleSunToNormal * 0.5 + 0.5;
+
+	// Select day or night texture based on mix.
+	vec3 blue = vec3(0.2,0.4,0.8);
+	vec3 color = mix( colorNight+vec3(0.1,0.1,0.2)*cloudamount, colorDay+(specular_value/1.3)+vec3(1.0,1.0,1.0)*cloudamount+blue*(1.0-atmos_amount), sphere_diffuse);
+
+	gl_FragColor = vec4( color , 1.0 );
+
+}
+</script>
+
+<!-- End Shaders -->
+<script type="text/javascript">
+
+var sphere;
+var rotationamount = 0;
+var camheight = 0;
+var x = 1.0;
+var z = 0.0;
+
+// set the scene size
+var WIDTH = window.innerWidth,
+HEIGHT = window.innerHeight;
+
+// set some camera attributes
+var VIEW_ANGLE = 45,
+ASPECT = WIDTH / HEIGHT,
+NEAR = 0.1,
+FAR = 10000;
+
+// get the DOM element to attach to
+// - assume we've got jQuery to hand
+var $container = $('#container');
+
+// create a WebGL renderer, camera
+// and a scene
+var renderer = new THREE.WebGLRenderer();
+var camera = new THREE.PerspectiveCamera(  VIEW_ANGLE,
+ASPECT,
+NEAR,
+FAR  );
+var scene = new THREE.Scene();
+
+// start the renderer
+renderer.setSize(WIDTH, HEIGHT);
+
+// attach the render-supplied DOM element
+$container.append(renderer.domElement);
+
+var pointLight = new THREE.PointLight(0xFFFFFF);
+//pointLight.intensity(1.0)
+
+// set its position
+pointLight.position.x = 1.0;
+pointLight.position.y = 0;
+pointLight.position.z = 0.0;
+
+var uniforms = {
+sunDirection: { type: "v3", value: new THREE.Vector3(pointLight.position.x,0,pointLight.position.z) },
+texture1: { type: "t", value: THREE.ImageUtils.loadTexture( "earth4096.jpg" ) },
+texture2: { type: "t", value: THREE.ImageUtils.loadTexture( "EarthNight.jpg" ) }, 
+spectexture: { type: "t", value: THREE.ImageUtils.loadTexture( "EarthSpec.jpg" ) },
+cloudtexture: { type: "t", value: THREE.ImageUtils.loadTexture( "clouds4096.jpg" ) }
+};
+
+var vertShader = document.getElementById('vertexShader').innerHTML;
+var fragShader = document.getElementById('fragmentShader').innerHTML;
+
+// create the sphere's material
+var shaderMaterial = new THREE.ShaderMaterial({
+uniforms: uniforms,
+vertexShader:   vertShader,
+fragmentShader: fragShader
+});
+
+// set up the sphere vars
+var radius = 50, segments = 64, rings = 64;
+
+// create a new mesh with sphere geometry -
+// we will cover the sphereMaterial next!
+var earth = new THREE.Mesh(
+new THREE.SphereGeometry(radius, segments, rings),
+shaderMaterial);
+
+// add to the scene
+scene.add(pointLight);
+
+// add the sphere to the scene
+scene.add(earth);
+scene.add(camera);
+
+function render(){
+renderer.render(scene, camera);
+}
+
+function update(){
+
+earth.rotation.y = rotationamount;
+rotationamount += 0.001
+camera.lookAt(earth.position)
+camheight = 120+ Math.sin( rotationamount * 0.9) * 0.0;
+uniforms["sunDirection"].value = new THREE.Vector3(Math.sin( -rotationamount * 2.9),0.0,Math.cos( rotationamount * 2.9));
+camera.position.z = camheight;
+camera.position.y = camera.position.z/2.0;
+}
+
+function animate() 
+{
+requestAnimationFrame( animate );
+render();		
+update();
+}
+
+animate();
+
+</script>
+</html>
