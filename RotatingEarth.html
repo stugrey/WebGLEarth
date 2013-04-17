@@ -31,8 +31,8 @@ varying vec3 v_P;
 
 void main() 
 {
-	vUv = uv;
-	vNormal = normalMatrix * normal;
+	vUv = uv; //Texture position
+	vNormal = normalMatrix * normal; // Calculate surface normal
 	gl_Position =   projectionMatrix * modelViewMatrix * vec4(position,1.0);
 	v_P = gl_Position.xyz;
 }
@@ -52,17 +52,23 @@ varying vec3 v_P;
 void main() 
 {
 
+	// Values from textures using the texture coordinate from the vertex shader
 	vec3 colorDay = texture2D(texture1, vUv).rgb;
 	vec3 colorNight = texture2D(texture2, vUv).rgb;
 	vec3 colorSpec = texture2D(spectexture, vUv).rgb;
+	// Rather than a RGB colour for the clouds we just want a numerical value
+	// In this case we use the red channel although this is obviosuly not ideal
 	float cloudamount = texture2D(cloudtexture, vUv).r;
 
-
-	float diffuse_value = max(dot(normalize(vNormal), sunDirection), 0.0);
+	//Calculate the diffuse component of the reflected light from the sun
 	float sphere_diffuse = max(dot(normalize(vNormal), sunDirection), 0.0);
+
+	// Calculate the amount of atmospheric reflection absed on viewer position
 	float atmos_amount = max(dot(normalize(vNormal), vec3(0.0,0.0,1.0)), 0.0);
 	vec3 R  = 2.0 * ( dot(normalize(vNormal),sunDirection)) * normalize(vNormal) - sunDirection;
 	vec3 E = vec3(0.0,0.0,1.0);
+
+	//Calculate amount of specular light reflected
 	vec3 specular_value =  colorSpec * pow( max(dot(R,E), 0.0), 6.0 );
 
 	vec3 lights;
@@ -183,7 +189,7 @@ function update(){
 earth.rotation.y = rotationamount;
 rotationamount += 0.001
 camera.lookAt(earth.position)
-camheight = 120+ Math.sin( rotationamount * 0.9) * 0.0;
+camheight = 120;
 uniforms["sunDirection"].value = new THREE.Vector3(Math.sin( -rotationamount * 2.9),0.0,Math.cos( rotationamount * 2.9));
 camera.position.z = camheight;
 camera.position.y = camera.position.z/2.0;
