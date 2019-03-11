@@ -7,11 +7,12 @@ The night/day cycle, city lights, clouds and surface specularity are all produce
 
 ## Usage
 
-To view you can put the files on a web server (including local server), place and view by URL in your Dropbox public folder or view locally as long you have disable the cross-domain file restrictions in your browser of choice (e.g. _--allow-file-access-from-files_ flag in chrome)
+To view you can put the files on a web server (including a local server such as: python3 -m http.server 8000)
 
 tested in:
-* Chrome 26
-* Firefox 20
+* Chrome 72
+* Firefox 65
+* Safari 12
 
 ## Output
 
